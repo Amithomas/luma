@@ -1,0 +1,28 @@
+# Sensitive config
+config.py
+
+# Database files
+memory.db
+chroma_db/
+
+# Downloaded reels temp files
+*.mp4
+*.mp3
+*.wav
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# PyCharm
+.idea/
+
+# Mac
+.DS_Store
+
+# Whisper model cache
+~/.cache/
