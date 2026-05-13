@@ -6,6 +6,7 @@ from mood import initialize_db, save_mood, save_message
 from reel import process_reel
 from brain import process_reel_and_respond, chat, check_and_summarise, classify_mood, learn_command, knowledge_command
 import logging
+from agent.loop import run_agent
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -80,7 +81,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             save_message(user_id, "assistant", response)
             await processing_msg.delete()
-            await update.message.reply_text(response)
+            await update.message.reply_text(response,
+                            parse_mode="Markdown")
 
         except Exception as e:
             logger.error(f"Error processing reel: {e}")
@@ -111,7 +113,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
         try:
-            response = chat(user_id, text)
+            response = run_agent(user_id, text)
             save_message(user_id, "assistant", response)
             check_and_summarise(user_id)
             await thinking_msg.delete()
