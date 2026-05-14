@@ -42,6 +42,7 @@ AVAILABLE_TOOLS = {
     },
     "search_knowledge": {
         "description": "Search the personal knowledge base for relevant information. ALWAYS use this first before web_search — it may already have what you need",
+        "args": ["query"],
         "example": 'search_knowledge("anxiety management techniques")'
     },
     "save_to_knowledge": {
