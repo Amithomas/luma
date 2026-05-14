@@ -6,7 +6,7 @@ from mood import initialize_db, save_mood, save_message
 from reel import process_reel
 from brain import process_reel_and_respond, chat, check_and_summarise, classify_mood, learn_command, knowledge_command
 import logging
-from agent.loop import run_agent
+from agent.loop import run_agent, run_agent_with_reel
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -73,11 +73,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_message(user_id, "user", f"Shared a reel: {text}")
 
             # Get emotional response
-            response = process_reel_and_respond(
-                user_id,
-                reel_data["transcript"],
-                reel_data["frames"]
-            )
+            response = run_agent_with_reel(user_id, reel_data)
 
             save_message(user_id, "assistant", response)
             await processing_msg.delete()

@@ -2,6 +2,8 @@
 
 import requests
 import json
+
+from brain import analyze_frames
 from config import OLLAMA_URL, OLLAMA_MODEL
 from agent.parser import (
     parse_action,
@@ -76,6 +78,10 @@ IMPORTANT INSTRUCTIONS:
 - NEVER generate or modify YouTube URLs
 - ONLY use URLs exactly as they appear in the Observation
 - If a URL appears in Observation, copy it character by character
+- ALWAYS call search_knowledge() first before web_search — check existing knowledge first
+- After a useful web_search result, consider calling save_to_knowledge() to remember it
+- Only save genuinely useful, factual content — not casual conversation
+- When responding to a reel, ALWAYS search youtube_shorts for related content if the reel has a clear topic or theme
 
 
 You must respond in this exact format:
@@ -173,6 +179,121 @@ def run_agent(user_id, message):
     # Max iterations reached — ask LLaMA for final answer with all context
     print(f"⚠️ Max iterations reached, forcing final answer...")
     prompt = build_agent_prompt(user_id, message, conversation_history)
+    prompt += "\nFinal Answer:"
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.7,
+            "max_tokens": 400,
+            "stop": []
+        }
+    }
+
+    response = requests.post(OLLAMA_URL, json=payload)
+    result = response.json()
+    return result.get("response", "I'm having trouble thinking right now 😅").strip()
+
+
+def run_agent_with_reel(user_id, reel_data):
+    transcript = reel_data.get("transcript", "")
+    frames = reel_data.get("frames", [])
+
+    print(f"\n🎬 Agent processing reel...")
+
+    # Step 1 — Get visual description from LLaVA
+    print("👁️ Analysing frames with LLaVA...")
+    visual_description = analyze_frames(frames)
+
+    # Step 2 — Build reel context
+    reel_context = f"""The user just shared an Instagram reel with you.
+
+What was heard (audio transcript):
+{transcript if transcript else "No speech detected."}
+
+What was seen (visual description):
+{visual_description}
+
+Based on this reel and the user's emotional state:
+1. Respond emotionally as their best friend who just watched it
+2. Consider finding related YouTube Shorts if the reel topic warrants it
+3. Consider searching knowledge base for relevant information
+4. Save any useful discoveries to knowledge base"""
+
+    # Step 3 — Run agent with reel context as the message
+    print("🤖 Agent deciding how to respond...")
+
+    conversation_history = ""
+    iterations = 0
+
+    while iterations < MAX_ITERATIONS:
+        iterations += 1
+        print(f"\n--- Reel Agent Iteration {iterations} ---")
+
+        prompt = build_agent_prompt(user_id, reel_context, conversation_history)
+
+        payload = {
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.7,
+                "max_tokens": 600,
+                "stop": ["Observation:", "\nObservation"]
+            }
+        }
+
+        response = requests.post(OLLAMA_URL, json=payload)
+        result = response.json()
+        llama_output = result.get("response", "").strip()
+
+        # Strip hallucinated observations
+        if "Observation" in llama_output:
+            llama_output = llama_output.split("Observation")[0].strip()
+        if "appeared on screen" in llama_output:
+            llama_output = llama_output.split("appeared on screen")[0].strip()
+            llama_output = llama_output.rsplit("\n", 1)[0].strip()
+
+        print(f"Agent output:\n{llama_output}\n")
+
+        # Check for final answer
+        if is_final_answer(llama_output):
+            final = parse_final_answer(llama_output)
+            if final:
+                print(f"✅ Reel response ready after {iterations} iterations")
+                return final
+
+        # Parse and execute tool
+        tool_name, parsed_args = parse_action(llama_output)
+
+        if not tool_name:
+            print("⚠️ No action found, using output as final answer")
+            return llama_output
+
+        thought = parse_thought(llama_output)
+        if thought:
+            print(f"💭 Thought: {thought[:100]}...")
+
+        tool_result = execute_tool(tool_name, parsed_args, user_id)
+
+        if tool_result is None:
+            prompt_direct = build_agent_prompt(user_id, reel_context, "")
+            prompt_direct += "\nThought: I have enough context to respond.\nFinal Answer:"
+            payload["prompt"] = prompt_direct
+            payload["options"]["stop"] = []
+            response = requests.post(OLLAMA_URL, json=payload)
+            result = response.json()
+            return result.get("response", "").strip()
+
+        observation = format_observation(tool_name, tool_result)
+        conversation_history += f"\n{llama_output}{observation}"
+        print(f"📊 Observation added, continuing...")
+
+    # Force final answer
+    print("⚠️ Max iterations reached, forcing final answer...")
+    prompt = build_agent_prompt(user_id, reel_context, conversation_history)
     prompt += "\nFinal Answer:"
 
     payload = {

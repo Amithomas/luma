@@ -1,6 +1,7 @@
 # agent/parser.py
 
 import re
+from brain import analyze_frames
 
 # Define what tools LLaMA is allowed to call
 AVAILABLE_TOOLS = {
@@ -38,6 +39,15 @@ AVAILABLE_TOOLS = {
         "description": "Respond directly without using any tool",
         "args": [],
         "example": "no_tool()"
+    },
+    "search_knowledge": {
+        "description": "Search the personal knowledge base for relevant information. ALWAYS use this first before web_search — it may already have what you need",
+        "example": 'search_knowledge("anxiety management techniques")'
+    },
+    "save_to_knowledge": {
+        "description": "Save useful information discovered from web search to the knowledge base for future use. Use this when web_search returns genuinely useful content worth remembering",
+        "args": ["content", "source"],
+        "example": 'save_to_knowledge("article content here", "https://source-url.com")'
     }
 }
 
@@ -126,3 +136,4 @@ def format_observation(tool_name, result):
             f"Only use URLs that appear in the Observation above.\n"
         )
     return f"\nObservation: [{tool_name}] returned:\n{result}\n"
+

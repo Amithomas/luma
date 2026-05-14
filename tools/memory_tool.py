@@ -1,6 +1,9 @@
 # tools/memory_tool.py
 
 from mood import get_recent_mood, get_conversation_history, get_summaries
+from rag.retriever import get_relevant_context
+from rag.embedder import embed_and_store
+from rag.loader import load_webpage
 
 
 def get_mood_summary(user_id):
@@ -65,3 +68,32 @@ def search_conversation_history(user_id, keyword):
         formatted += f"{label}: {match['message'][:200]}\n\n"
 
     return formatted.strip()
+
+
+def search_knowledge(query):
+    print(f"📚 Searching knowledge base: {query}")
+
+    context = get_relevant_context(query)
+
+    if not context:
+        return "No relevant knowledge found in the database."
+
+    return context
+
+
+def save_to_knowledge(content, source="agent_discovered"):
+    print(f"💾 Saving to knowledge base from: {source}")
+
+    try:
+        document = {
+            "source": source,
+            "type": "agent_discovered",
+            "content": content
+        }
+
+        chunk_count = embed_and_store(document)
+
+        return f"Successfully saved {chunk_count} chunks from {source} to knowledge base."
+
+    except Exception as e:
+        return f"Failed to save to knowledge base: {str(e)}"

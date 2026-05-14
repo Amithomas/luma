@@ -6,7 +6,9 @@ from tools.youtube import youtube_search
 from tools.memory_tool import (
     get_mood_summary,
     get_conversation_summary,
-    search_conversation_history
+    search_conversation_history,
+    search_knowledge,
+    save_to_knowledge
 )
 
 # Registry — maps tool name strings to actual functions
@@ -17,6 +19,8 @@ TOOL_REGISTRY = {
     "youtube_shorts": lambda query: youtube_search(query, shorts=True),
     "get_mood_summary": get_mood_summary,
     "search_memory": search_conversation_history,
+    "search_knowledge": search_knowledge,
+    "save_to_knowledge": save_to_knowledge,
     "no_tool": lambda: None
 }
 
@@ -33,6 +37,7 @@ def execute_tool(tool_name, parsed_args, user_id):
     kwargs = parsed_args.get("kwargs", {})
 
     try:
+
         # Tools that need user_id injected automatically
         if tool_name in ["get_mood_summary"]:
             return tool_fn(user_id)
@@ -40,6 +45,10 @@ def execute_tool(tool_name, parsed_args, user_id):
         # Tools that need user_id as first arg
         elif tool_name in ["search_memory"]:
             return tool_fn(user_id, *args)
+
+        # RAG tools — no user_id needed
+        elif tool_name in ["search_knowledge", "save_to_knowledge"]:
+            return tool_fn(*args)
 
         # no_tool — LLaMA wants to respond directly
         elif tool_name == "no_tool":
